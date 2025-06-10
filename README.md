@@ -157,10 +157,7 @@ B-NAME I-NAME O O B-COMPANY I-COMPANY
 
 #### **💾 Model Deployment**
 
-The trained model is compressed using **mixed precision (FP16)** to reduce size from ~440MB to ~208MB while maintaining performance:
-
-
-```
+The trained model is compressed using **mixed precision (FP16)** to reduce size from ~440MB to ~208MB while maintaining performance.
 
 #### **🎯 Entity Extraction Pipeline**
 
@@ -344,6 +341,4 @@ MAIL_SERVER=mail.yourdomain.com
 MAIL_PORT=587
 ```
 
-```
-
-Thank You
+**Thank you for using Resume NER Application!** 🚀 
