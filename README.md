@@ -57,10 +57,136 @@ A powerful full-stack web application that leverages AI-powered Named Entity Rec
 
 ### **AI/Machine Learning**
 - **PyTorch 2.7.0** - Deep learning framework
-- **Transformers 4.52.3** - Pre-trained language models
-- **Custom NER Model** - Specialized for resume entity extraction
+- **Transformers 4.52.3** - HuggingFace transformers library
+- **BERT-base-uncased** - Pre-trained foundation model
+- **Custom Fine-tuned NER Model** - Resume-specific entity extraction
 - **PDFMiner.six** - PDF text extraction and processing
 - **Unidecode 1.4.0** - Text normalization
+- **seqeval** - Sequence evaluation metrics for NER
+
+## 🧠 AI Model Architecture & Training
+
+### **Custom BERT Fine-tuning for Resume NER**
+
+Our application uses a **fine-tuned BERT model** specifically trained on resume data to extract structured information. The model is based on `bert-base-uncased` and fine-tuned using a comprehensive dataset of 430 annotated resumes.
+
+#### **📊 Model Training Details**
+
+| **Aspect** | **Details** |
+|------------|-------------|
+| **Base Model** | `bert-base-uncased` (110M parameters) |
+| **Training Data** | 430 annotated resume samples |
+| **Entity Types** | 8 classes: NAME, EMAIL, PHONE, SKILLS, COMPANY, DESIGNATION, DEGREE, COLLEGE NAME, LOCATION |
+| **Sequence Length** | 256 tokens (optimized for resume content) |
+| **Training Split** | 70% train, 15% validation, 15% test |
+| **Batch Size** | 8 (optimized for memory efficiency) |
+| **Learning Rate** | 1e-5 (with linear warmup) |
+| **Training Epochs** | Up to 100 (with early stopping) |
+| **Final Model Size** | 208MB (compressed with mixed precision) |
+
+#### **🏷️ BIO Tagging Schema**
+
+The model uses **BIO (Beginning-Inside-Outside)** tagging for sequence labeling:
+
+```
+B-ENTITY: Beginning of an entity
+I-ENTITY: Inside/continuation of an entity  
+O: Outside (non-entity token)
+```
+
+**Example:**
+```
+John Smith works at Google Inc.
+B-NAME I-NAME O O B-COMPANY I-COMPANY
+```
+
+#### **📈 Model Performance Metrics**
+
+**Final Test Results:**
+- **Token-level Accuracy:** 96.15%
+- **Entity-level Precision:** 75.96%
+- **Entity-level Recall:** 84.99%
+- **Entity-level F1-Score:** 80.22%
+
+**Per-Entity Performance:**
+| **Entity Type** | **Precision** | **Recall** | **F1-Score** | **Support** |
+|-----------------|---------------|------------|--------------|-------------|
+| **NAME** | 94.20% | 98.48% | 96.30% | 66 |
+| **EMAIL** | 87.30% | 98.21% | 92.44% | 56 |
+| **LOCATION** | 82.61% | 93.83% | 87.86% | 81 |
+| **DESIGNATION** | 79.20% | 84.62% | 81.82% | 117 |
+| **DEGREE** | 70.83% | 85.00% | 77.27% | 20 |
+| **COMPANY** | 68.33% | 73.21% | 70.69% | 112 |
+| **COLLEGE NAME** | 57.14% | 74.07% | 64.52% | 27 |
+| **SKILLS** | 47.83% | 64.71% | 55.00% | 34 |
+
+#### **🔧 Training Process**
+
+1. **Data Preprocessing:**
+   - Text normalization and cleaning
+   - BIO format conversion
+   - Stratified train/validation/test splits
+   - Token alignment with word boundaries
+
+2. **Model Architecture:**
+   - Base: BERT-base-uncased (12 layers, 768 hidden size)
+   - Added classification head for token classification
+   - 17 output labels (8 entities × 2 BIO tags + 1 O tag)
+
+3. **Training Configuration:**
+   ```python
+   # Training hyperparameters
+   BATCH_SIZE = 8
+   MAX_LEN = 256
+   LEARNING_RATE = 1e-5
+   EPOCHS = 100
+   WARMUP_STEPS = 500
+   WEIGHT_DECAY = 0.01
+   ```
+
+4. **Optimization Techniques:**
+   - **Early Stopping:** Prevents overfitting (patience=7)
+   - **Learning Rate Scheduling:** Linear warmup + decay
+   - **Mixed Precision Training:** Reduces memory usage
+   - **Model Compression:** FP16 precision for deployment
+
+5. **Evaluation Strategy:**
+   - Token-level accuracy for sequence labeling
+   - Entity-level precision, recall, F1 using `seqeval`
+   - Stratified validation to handle class imbalance
+
+#### **💾 Model Deployment**
+
+The trained model is compressed using **mixed precision (FP16)** to reduce size from ~440MB to ~208MB while maintaining performance:
+
+
+```
+
+#### **🎯 Entity Extraction Pipeline**
+
+1. **PDF Processing:** Extract raw text using PDFMiner
+2. **Text Cleaning:** Remove noise, normalize encoding
+3. **Tokenization:** BERT tokenizer with proper alignment
+4. **Inference:** Forward pass through fine-tuned model
+5. **Post-processing:** Convert predictions to entities
+6. **Grouping:** Combine B- and I- tags into complete entities
+7. **Deduplication:** Remove duplicate entities
+
+#### **🔬 Training Notebook**
+
+The complete training process is documented in `backend/Bert_Fine_Tunning.ipynb`, including:
+- Data exploration and preprocessing
+- Model architecture setup
+- Training loop with validation
+- Performance evaluation
+- Model compression and export
+
+**Key Features:**
+- Comprehensive data analysis with label distribution
+- Stratified splitting to handle class imbalance
+- Real-time training metrics and visualization
+- Entity-level evaluation using seqeval
+- Model checkpointing and early stopping
 
 ## 📁 Project Architecture
 
@@ -218,322 +344,6 @@ MAIL_SERVER=mail.yourdomain.com
 MAIL_PORT=587
 ```
 
-## 🔌 API Reference
-
-### 🔐 Authentication Endpoints
-
-#### User Registration
-```http
-POST /auth/register
-Content-Type: application/json
-
-{
-  "full_name": "John Doe",
-  "email": "john.doe@example.com",
-  "password": "SecurePassword123!"
-}
 ```
 
-**Response:**
-```json
-{
-  "status": 201,
-  "message": "User registered successfully",
-  "user_id": "uuid-here"
-}
-```
-
-#### User Login
-```http
-POST /auth/login
-Content-Type: application/json
-
-{
-  "email": "john.doe@example.com",
-  "password": "SecurePassword123!"
-}
-```
-
-**Response:**
-```json
-{
-  "status": 200,
-  "message": "Login successful",
-  "access_token": "jwt-token-here",
-  "user": {
-    "id": "uuid",
-    "email": "john.doe@example.com",
-    "full_name": "John Doe",
-    "is_verified": true
-  }
-}
-```
-
-#### Email Verification
-```http
-POST /auth/verify-email
-Content-Type: application/json
-
-{
-  "email": "john.doe@example.com",
-  "code": "123456"
-}
-```
-
-### 📄 Resume Processing Endpoints
-
-#### Upload & Process Resume
-```http
-POST /minedata
-Authorization: Bearer <jwt_token>
-Content-Type: multipart/form-data
-
-{
-  "file": <pdf_file>
-}
-```
-
-**Response:**
-```json
-{
-  "status": 200,
-  "message": "Success",
-  "resume_id": "uuid-here",
-  "entities": {
-    "personal_info": {
-      "name": "John Doe",
-      "email": "john@example.com",
-      "phone": "+1-234-567-8900"
-    },
-    "education": [
-      {
-        "degree": "Bachelor of Science",
-        "institution": "University of Technology",
-        "graduation_date": "2023"
-      }
-    ],
-    "experience": [
-      {
-        "company": "Tech Corp",
-        "position": "Software Engineer",
-        "duration": "2020-2023"
-      }
-    ],
-    "skills": ["Python", "React", "PostgreSQL", "AI/ML"]
-  }
-}
-```
-
-#### Get User Resumes
-```http
-GET /api/resumes
-Authorization: Bearer <jwt_token>
-```
-
-#### Get Resume Details
-```http
-GET /api/resume/<resume_id>
-Authorization: Bearer <jwt_token>
-```
-
-## 🎯 Usage Workflow
-
-1. **🔐 Register Account** → Provide name, email, and secure password
-2. **📧 Verify Email** → Enter 6-digit code sent to your email
-3. **🔑 Login** → Access the main dashboard
-4. **📤 Upload Resume** → Drag & drop or select PDF file
-5. **⏳ Processing** → AI extracts entities in real-time
-6. **📊 View Results** → Review extracted information
-7. **💾 Save/Export** → Store data or export in various formats
-
-## 🧪 Testing
-
-### Backend Testing
-```bash
-cd backend
-# Install test dependencies
-pip install pytest pytest-cov
-
-# Run tests
-python -m pytest tests/ -v
-python -m pytest tests/ --cov=. --cov-report=html
-```
-
-### Frontend Testing
-```bash
-cd frontend
-# Run unit tests
-npm test
-
-# Run tests with coverage
-npm test -- --coverage --watchAll=false
-```
-
-## 🚀 Deployment
-
-### 🐳 Docker Deployment
-```bash
-# Build and run with Docker Compose
-docker-compose up --build
-
-# Production deployment
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-### ☁️ Cloud Deployment
-
-#### Backend (Heroku)
-```bash
-# Install Heroku CLI and login
-heroku login
-
-# Create app and add PostgreSQL
-heroku create your-app-name
-heroku addons:create heroku-postgresql:hobby-dev
-
-# Set environment variables
-heroku config:set JWT_SECRET_KEY=your-secret-key
-heroku config:set MAIL_USERNAME=your-email@gmail.com
-heroku config:set MAIL_PASSWORD=your-app-password
-
-# Deploy
-git push heroku main
-```
-
-#### Frontend (Vercel/Netlify)
-```bash
-# Build for production
-npm run build
-
-# Deploy to Vercel
-npx vercel --prod
-
-# Deploy to Netlify
-npm install -g netlify-cli
-netlify deploy --prod --dir=build
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-### Development Setup
-1. **Fork** the repository
-2. **Clone** your fork: `git clone https://github.com/yourusername/resume-ner-application.git`
-3. **Create branch**: `git checkout -b feature/amazing-feature`
-4. **Make changes** and add tests
-5. **Commit**: `git commit -m 'Add amazing feature'`
-6. **Push**: `git push origin feature/amazing-feature`
-7. **Create Pull Request**
-
-### Code Standards
-- **Python**: Follow PEP 8, use type hints
-- **JavaScript**: Use ESLint, Prettier formatting
-- **Git**: Conventional commit messages
-- **Testing**: Maintain >80% code coverage
-
-## 🐛 Troubleshooting
-
-### Common Issues & Solutions
-
-#### ❌ Database Connection Error
-```bash
-# Check PostgreSQL status
-sudo systemctl status postgresql
-
-# Reset connection
-sudo systemctl restart postgresql
-
-# Verify connection
-psql -h localhost -U resume_user -d resume_ner_db
-```
-
-#### ❌ Email Not Sending
-- ✅ Verify Gmail 2FA is enabled
-- ✅ Use App Password, not regular password
-- ✅ Check firewall/antivirus blocking SMTP
-- ✅ Verify MAIL_SERVER and MAIL_PORT settings
-
-#### ❌ AI Model Loading Error
-```bash
-# Check model file exists and size
-ls -lh backend/compressed_resume_ner_model_v2.pt
-
-# Should be ~208MB. If missing, re-download or train model
-```
-
-#### ❌ Frontend Build Issues
-```bash
-# Clear cache and reinstall
-rm -rf node_modules package-lock.json
-npm cache clean --force
-npm install
-```
-
-#### ❌ CORS Errors
-- ✅ Verify Flask-CORS is installed
-- ✅ Check backend is running on correct port (8002)
-- ✅ Update frontend proxy configuration
-
-## 📊 Performance Optimization
-
-### Backend Optimizations
-- **Database Indexing**: Add indexes on frequently queried fields
-- **Caching**: Implement Redis for session management
-- **File Storage**: Use cloud storage (S3, Google Cloud) for PDFs
-- **Load Balancing**: Use Gunicorn with multiple workers
-
-### Frontend Optimizations
-- **Code Splitting**: Implement React.lazy() for route-based splitting
-- **Memoization**: Use React.memo() and useMemo() for expensive components
-- **Bundle Analysis**: Run `npm run build --analyze` to optimize bundle size
-- **CDN**: Serve static assets via CDN
-
-## 🔒 Security Considerations
-
-### Backend Security
-- **Environment Variables**: Never commit .env files
-- **JWT Expiration**: Set appropriate token expiration times
-- **Rate Limiting**: Implement API rate limiting
-- **Input Validation**: Validate all user inputs
-- **HTTPS**: Use SSL certificates in production
-
-### Frontend Security
-- **XSS Prevention**: Sanitize user inputs
-- **CSRF Protection**: Implement CSRF tokens
-- **Secure Storage**: Use secure methods for token storage
-- **Content Security Policy**: Implement CSP headers
-
-## 📄 License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-## 👥 Contributors
-
-- **Your Name** - *Initial Development* - [@yourusername](https://github.com/yourusername)
-
-## 🙏 Acknowledgments
-
-- **PyTorch Team** - Deep learning framework
-- **Material-UI** - React component library
-- **Flask Community** - Web framework
-- **Transformers** - NLP model library
-- **Open Source Community** - Various dependencies and tools
-
-## 📞 Support & Contact
-
-### 🆘 Get Help
-- **📖 Documentation**: Check this README and inline code comments
-- **🐛 Issues**: [Create an issue](https://github.com/yourusername/resume-ner-application/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/yourusername/resume-ner-application/discussions)
-- **📧 Email**: your-email@example.com
-
-### 🌟 Show Your Support
-Give a ⭐️ if this project helped you!
-
-[![GitHub stars](https://img.shields.io/github/stars/yourusername/resume-ner-application?style=social)](https://github.com/yourusername/resume-ner-application/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/yourusername/resume-ner-application?style=social)](https://github.com/yourusername/resume-ner-application/network/members)
-
----
-
-**Made with ❤️ by developers, for developers** 🚀 
+Thank You
